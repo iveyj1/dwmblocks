@@ -27,10 +27,10 @@ clean:
 
 install: dwmblocks
 	mkdir -p ${DESTDIR}${PREFIX}/bin
-	cp -f dwmblocks ${DESTDIR}${PREFIX}/bin
-	chmod 755 ${DESTDIR}${PREFIX}/bin/dwmblocks
+	cp -f dwmblocks dwmblocks-charge-rate dwmblocks-wifi ${DESTDIR}${PREFIX}/bin
+	chmod 755 ${DESTDIR}${PREFIX}/bin/dwmblocks ${DESTDIR}${PREFIX}/bin/dwmblocks-charge-rate ${DESTDIR}${PREFIX}/bin/dwmblocks-wifi
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/dwmblocks
+	rm -f ${DESTDIR}${PREFIX}/bin/dwmblocks ${DESTDIR}${PREFIX}/bin/dwmblocks-charge-rate ${DESTDIR}${PREFIX}/bin/dwmblocks-wifi
 
 .PHONY: all options clean install uninstall

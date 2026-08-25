@@ -1,0 +1,22 @@
+#!/bin/bash
+
+BAT=/sys/class/power_supply/BAT0
+
+[ -d "$BAT" ] || exit 0
+
+status=$(cat "$BAT/status")
+cap=$(cat "$BAT/capacity")
+current=$(cat "$BAT/current_now" 2>/dev/null)
+voltage=$(cat "$BAT/voltage_now" 2>/dev/null)
+
+if [[ "$status" == "Charging" ]]; then
+    sign="-1"
+else
+    sign="1"
+fi
+
+watts=$(awk -v c="$current" -v v="$voltage" -v s="$sign" 'BEGIN {
+    printf "%.1f", s * c * v / 1000000000000
+}')
+
+printf "%s%% %sW\n" "$cap" "$watts"

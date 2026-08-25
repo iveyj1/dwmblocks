@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Show the active Wi-Fi association without triggering a scan.
+command -v iw >/dev/null 2>&1 || exit 0
+
+touch /tmp/dwmblocks-wifi-hit
+for iface in $(iw dev 2>/dev/null | awk '$1 == "Interface" { print $2 }'); do
+    link=$(iw dev "$iface" link 2>/dev/null)
+    bssid=$(printf '%s\n' "$link" | awk '/^Connected to / { print $3; exit }')
+    [ -n "$bssid" ] || continue
+
+    ssid=$(printf '%s\n' "$link" | sed -n 's/^[[:space:]]*SSID: //p' | head -n 1)
+    signal=$(printf '%s\n' "$link" | awk '/^[[:space:]]*signal:/ { print $2; exit }')
+
+    printf 'WiFi %s %sdBm %s\n' "$ssid" "$signal" "${bssid##*:}"
+    exit 0
+done
+printf 'WiFi down\n'
