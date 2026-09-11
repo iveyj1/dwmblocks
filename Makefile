@@ -33,4 +33,9 @@ install: dwmblocks
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/dwmblocks ${DESTDIR}${PREFIX}/bin/dwmblocks-charge-rate ${DESTDIR}${PREFIX}/bin/dwmblocks-wifi
 
-.PHONY: all options clean install uninstall
+check:
+	@set -eu; testbin=$$(mktemp); trap 'rm -f "$$testbin"' EXIT HUP INT TERM; \
+	${CC} ${CFLAGS} -D_POSIX_C_SOURCE=200809L tests/status.c -o "$$testbin"; \
+	"$$testbin"
+
+.PHONY: all options clean install uninstall check

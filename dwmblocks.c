@@ -14,9 +14,9 @@
 #define SIGMINUS		SIGRTMIN
 #endif
 #define LENGTH(X)               (sizeof(X) / sizeof (X[0]))
-#define CMDLENGTH		50
-#define MIN( a, b ) ( ( a < b) ? a : b )
-#define STATUSLENGTH (LENGTH(blocks) * CMDLENGTH + 1)
+#define CMDLENGTH		256
+/* Match dwm's stext buffer, including the terminating NUL. */
+#define STATUSLENGTH 256
 
 typedef struct {
 	char* icon;
@@ -53,32 +53,54 @@ static void (*writestatus) () = pstdout;
 static char statusbar[LENGTH(blocks)][CMDLENGTH] = {0};
 static char statusstr[2][STATUSLENGTH];
 static int statusContinue = 1;
+static const char *separator = delim;
 // static int returnStatus = 0;
 
-//opens process *cmd and stores output in *output
+/* Length of a bounded prefix, without splitting valid UTF-8 input. */
+static size_t textprefix(const char *text, size_t available)
+{
+	size_t n = strlen(text);
+	if (n <= available)
+		return n;
+	n = available;
+	while (n && ((unsigned char)text[n] & 0xc0) == 0x80)
+		n--;
+	return n;
+}
+
+static void appendtext(char *dest, size_t size, const char *text)
+{
+	size_t used = strlen(dest);
+	size_t n = textprefix(text, size - used - 1);
+	memcpy(dest + used, text, n);
+	dest[used + n] = '\0';
+}
+
+/* Store text only; separators are inserted between nonempty blocks later. */
 void getcmd(const Block *block, char *output)
 {
-	//make sure status is same until output is ready
-	char tempstatus[CMDLENGTH] = {0};
-	strcpy(tempstatus, block->icon);
+	char text[CMDLENGTH + 1];
+	size_t n = 0;
+	int c;
 	FILE *cmdf = popen(block->command, "r");
-	if (!cmdf)
+	if (!cmdf) {
+		output[0] = '\0';
 		return;
-	int i = strlen(block->icon);
-	fgets(tempstatus+i, CMDLENGTH-i-delimLen, cmdf);
-	i = strlen(tempstatus);
-	//if block and command output are both not empty
-	if (i != 0) {
-		//only chop off newline if one is present at the end
-		i = tempstatus[i-1] == '\n' ? i-1 : i;
-		if (delim[0] != '\0') {
-			strncpy(tempstatus+i, delim, delimLen);
-		}
-		else
-			tempstatus[i++] = '\0';
 	}
-	strcpy(output, tempstatus);
+	while ((c = fgetc(cmdf)) != EOF && c != '\n')
+		if (n < sizeof(text) - 1)
+			text[n++] = c;
+	text[n] = '\0';
+	/* Drain unused output so pclose cannot deadlock on a full pipe. */
+	while (fgetc(cmdf) != EOF)
+		;
 	pclose(cmdf);
+	output[0] = '\0';
+	if (!text[0])
+		return;
+	if (block->icon)
+		appendtext(output, CMDLENGTH, block->icon);
+	appendtext(output, CMDLENGTH, text);
 }
 
 void getcmds(int time)
@@ -118,11 +140,21 @@ void setupsignals()
 
 int getstatus(char *str, char *last)
 {
-	strcpy(last, str);
+	snprintf(last, STATUSLENGTH, "%s", str);
 	str[0] = '\0';
-	for (unsigned int i = 0; i < LENGTH(blocks); i++)
-		strcat(str, statusbar[i]);
-	str[strlen(str)-strlen(delim)] = '\0';
+	for (unsigned int i = 0; i < LENGTH(blocks); i++) {
+		size_t used = strlen(str);
+		size_t sep = used ? strlen(separator) : 0;
+		size_t available = STATUSLENGTH - used - 1;
+		if (!statusbar[i][0])
+			continue;
+		/* Never leave a dangling or partial separator. */
+		if (sep >= available || !textprefix(statusbar[i], available - sep))
+			break;
+		if (used)
+			appendtext(str, STATUSLENGTH, separator);
+		appendtext(str, STATUSLENGTH, statusbar[i]);
+	}
 	return strcmp(str, last);//0 if they are the same
 }
 
@@ -192,23 +224,26 @@ void termhandler()
 
 int main(int argc, char** argv)
 {
-	for (int i = 0; i < argc; i++) {//Handle command line arguments
-		if (!strcmp("-d",argv[i]))
-			strncpy(delim, argv[++i], delimLen);
-		else if (!strcmp("-p",argv[i]))
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp("-d", argv[i]) && i + 1 < argc)
+			separator = argv[++i];
+		else if (!strcmp("-p", argv[i]))
 			writestatus = pstdout;
+		else {
+			fprintf(stderr, "usage: dwmblocks [-p] [-d delimiter]\n");
+			return 1;
+		}
 	}
 #ifndef NO_X
-	if (!setupX())
+	if (writestatus == setroot && !setupX())
 		return 1;
 #endif
-	delimLen = MIN(delimLen, strlen(delim));
-	delim[delimLen++] = '\0';
 	signal(SIGTERM, termhandler);
 	signal(SIGINT, termhandler);
 	statusloop();
 #ifndef NO_X
-	XCloseDisplay(dpy);
+	if (dpy)
+		XCloseDisplay(dpy);
 #endif
 	return 0;
 }

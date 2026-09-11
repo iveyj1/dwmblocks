@@ -37,6 +37,18 @@ Each block has:
 {"icon", "shell command", interval_seconds, signal_number}
 ```
 
+Output is limited to 255 bytes in total, matching dwm's status buffer. Valid
+UTF-8 is truncated only at character boundaries. Empty command output suppresses
+the entire block (including its icon); separators appear only between displayed
+blocks. Icons are prefixes, not standalone blocks. Only the first output line is
+shown; remaining output is drained before waiting for the command to exit.
+Commands must terminate; this does not impose a backend timeout.
+
+`delim` sets the default separator; no separate `delimLen` is needed. Use
+`dwmblocks -d ' / '` to override it or `-d ''` for none. `dwmblocks -p` writes to
+stdout without opening an X display. Unknown options or a missing `-d` argument
+are errors.
+
 A nonzero interval refreshes automatically. A nonzero signal can be refreshed with a realtime signal using the dwmblocks signal patch behavior.
 
 ## Local changes
