@@ -3,7 +3,6 @@
 # Show the active Wi-Fi association without triggering a scan.
 command -v iw >/dev/null 2>&1 || exit 0
 
-touch /tmp/dwmblocks-wifi-hit
 for iface in $(iw dev 2>/dev/null | awk '$1 == "Interface" { print $2 }'); do
     link=$(iw dev "$iface" link 2>/dev/null)
     bssid=$(printf '%s\n' "$link" | awk '/^Connected to / { print $3; exit }')
