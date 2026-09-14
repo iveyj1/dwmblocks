@@ -26,7 +26,7 @@ use procps tools, `wpctl` (PipeWire/WirePlumber), and `iw`; Wi-Fi reporting does
 not depend on a particular network manager. The battery helper currently
 expects BAT0 with current_now/voltage_now; other hardware may need adjustment.
 
-The optional separate `mint-void-suckless` session launcher starts and cleans up
+The optional separate `configure-sl` session launcher starts and cleans up
 this process when installed. dwm itself remains usable without dwmblocks.
 Do not also start it in .xprofile when using that launcher.
 
