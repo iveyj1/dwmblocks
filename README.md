@@ -4,7 +4,7 @@ Personal modular status bar for dwm.
 
 ## Change-size history
 
-See [the fork history report](scripts/cloc_by_commit.md) for per-change runtime
+Generate the gitignored local report `scripts/cloc_by_commit.md` for per-change runtime
 and support cloc counts since the fork from torrinfail/dwmblocks. After editing,
 run `python3 scripts/update_cloc_by_commit.py` (Python 3.9+, git, cloc required).
 It prints latest totals/deltas and includes pending changes separately.
