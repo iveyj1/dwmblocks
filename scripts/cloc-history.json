@@ -1,0 +1,21 @@
+{
+  "project": "dwmblocks",
+  "baseline": "8cedd220684064f1433749ed2a19a6184c22cf07",
+  "baseline_description": "torrinfail/dwmblocks upstream fork baseline.",
+  "upstream_url": "https://github.com/torrinfail/dwmblocks",
+  "upstream_head": "8cedd220684064f1433749ed2a19a6184c22cf07",
+  "notes": ["dwmblocks is a companion tool, not a fork of an official suckless.org repository. Baseline verified against torrinfail/dwmblocks as the upstream/local merge-base.", "Inline status shell commands in blocks.h are counted as C configuration lines, not again as script lines. Standalone status helpers are runtime scripts."],
+  "config_pairs": [["blocks.h", "blocks.def.h"]],
+  "support": ["b"],
+  "exclude": ["buildinfo.h"],
+  "changes": {
+    "86ff600": "Track local Void status configuration (blocks.h); comment out unused returnStatus variable; update ignores.",
+    "e8ae0fa": "Add battery charge-rate and Wi-Fi status scripts, local block commands and install integration.",
+    "260e2e1": "Add b build/optional-install script.",
+    "2d64e66": "Document status blocks, helpers and installation.",
+    "1d0ad3a": "Exclude I/O-wait from busy CPU usage; align default block configuration.",
+    "fc9740d": "Bound status assembly, harden delimiters and empty/failing block handling; add C regression tests.",
+    "ad44ed0": "Document Mint/Void setup and remove Wi-Fi helper debug-file write.",
+    "8195c96": "Correct README dependency documentation."
+  }
+}
