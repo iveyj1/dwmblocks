@@ -1,4 +1,8 @@
+#define _POSIX_C_SOURCE 200809L
 #include<stdlib.h>
+#include<limits.h>
+#include<time.h>
+#include<sys/select.h>
 #include<stdio.h>
 #include<string.h>
 #include<unistd.h>
@@ -52,7 +56,10 @@ static void (*writestatus) () = pstdout;
 
 static char statusbar[LENGTH(blocks)][CMDLENGTH] = {0};
 static char statusstr[2][STATUSLENGTH];
-static int statusContinue = 1;
+static volatile sig_atomic_t statusContinue = 1;
+static volatile sig_atomic_t pending;
+static int signalbase;
+static sigset_t handledsignals;
 static const char *separator = delim;
 // static int returnStatus = 0;
 
@@ -123,19 +130,31 @@ void getsigcmds(unsigned int signal)
 	}
 }
 
-void setupsignals()
+void
+setupsignals(void)
 {
+	struct sigaction sa;
+	unsigned int i;
+
+	signalbase = SIGPLUS;
+	sigemptyset(&handledsignals);
+	sigaddset(&handledsignals, SIGTERM);
+	sigaddset(&handledsignals, SIGINT);
+	sigfillset(&sa.sa_mask);
+	sa.sa_flags = 0;
 #ifndef __OpenBSD__
-	    /* initialize all real time signals with dummy handler */
-    for (int i = SIGRTMIN; i <= SIGRTMAX; i++)
-        signal(i, dummysighandler);
+	sa.sa_handler = dummysighandler;
+	for (int sig = SIGRTMIN; sig <= SIGRTMAX; sig++)
+		sigaction(sig, &sa, NULL);
 #endif
-
-	for (unsigned int i = 0; i < LENGTH(blocks); i++) {
-		if (blocks[i].signal > 0)
-			signal(SIGMINUS+blocks[i].signal, sighandler);
+	sa.sa_handler = sighandler;
+	for (i = 0; i < LENGTH(blocks); i++) {
+		unsigned int n = blocks[i].signal;
+		if (n > 0 && n < sizeof(sig_atomic_t) * CHAR_BIT - 1) {
+			sigaddset(&handledsignals, signalbase + n);
+			sigaction(signalbase + n, &sa, NULL);
+		}
 	}
-
 }
 
 int getstatus(char *str, char *last)
@@ -189,32 +208,77 @@ void pstdout()
 }
 
 
-void statusloop()
+/* Caller blocks handledsignals while consuming the coalesced requests. */
+static sig_atomic_t
+takepending(void)
 {
+	sig_atomic_t result = pending;
+	pending = 0;
+	return result;
+}
+
+void
+statusloop(void)
+{
+	struct timespec now, next, delay;
+	sigset_t oldmask;
+	unsigned int tick = 0;
+	sig_atomic_t requests;
+
 	setupsignals();
-	int i = 0;
+	clock_gettime(CLOCK_MONOTONIC, &next);
+	next.tv_sec++;
 	getcmds(-1);
-	while (1) {
-		getcmds(i++);
+	sigprocmask(SIG_BLOCK, &handledsignals, &oldmask);
+	while (statusContinue) {
+		requests = takepending();
+		sigprocmask(SIG_SETMASK, &oldmask, NULL);
+		for (unsigned int n = 1; n < sizeof(sig_atomic_t) * CHAR_BIT - 1; n++)
+			if (requests & ((sig_atomic_t)1 << n))
+				getsigcmds(n);
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		while (now.tv_sec > next.tv_sec ||
+		    (now.tv_sec == next.tv_sec && now.tv_nsec >= next.tv_nsec)) {
+			getcmds(++tick);
+			next.tv_sec++;
+		}
 		writestatus();
+		sigprocmask(SIG_BLOCK, &handledsignals, NULL);
 		if (!statusContinue)
 			break;
-		sleep(1.0);
+		if (pending)
+			continue;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		delay.tv_sec = next.tv_sec - now.tv_sec;
+		delay.tv_nsec = next.tv_nsec - now.tv_nsec;
+		if (delay.tv_nsec < 0) {
+			delay.tv_sec--;
+			delay.tv_nsec += 1000000000L;
+		}
+		if (delay.tv_sec < 0)
+			delay = (struct timespec){0, 0};
+		/* Atomic unblock-and-wait avoids a lost signal before sleeping. */
+		pselect(0, NULL, NULL, NULL, &delay, &oldmask);
 	}
+	sigprocmask(SIG_SETMASK, &oldmask, NULL);
 }
 
 #ifndef __OpenBSD__
 /* this signal handler should do nothing */
-void dummysighandler(int signum)
+void
+dummysighandler(int signum)
 {
-    return;
+	(void)signum;
 }
 #endif
 
-void sighandler(int signum)
+void
+sighandler(int signum)
 {
-	getsigcmds(signum-SIGPLUS);
-	writestatus();
+	int n = signum - signalbase;
+
+	if (n > 0 && (unsigned int)n < sizeof(sig_atomic_t) * CHAR_BIT - 1)
+		pending |= (sig_atomic_t)1 << n;
 }
 
 void termhandler()

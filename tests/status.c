@@ -69,6 +69,18 @@ int main(void)
 	assert(dwmblocks_main(2, missing) == 1);
 	char *unknown[] = {"dwmblocks", "--unknown", NULL};
 	assert(dwmblocks_main(2, unknown) == 1);
+	/* Handlers only coalesce requests; no commands or X calls occur here. */
+	signalbase = SIGPLUS;
+	pending = 0;
+	sighandler(signalbase + 10);
+	sighandler(signalbase + 10);
+	sighandler(signalbase + 2);
+	assert(takepending() == ((1 << 10) | (1 << 2)));
+	assert(takepending() == 0);
+	sighandler(signalbase);
+	assert(takepending() == 0);
+	termhandler();
+	assert(!statusContinue);
 	puts("status tests passed");
 	return 0;
 }

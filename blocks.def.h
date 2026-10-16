@@ -2,7 +2,7 @@
 static const Block blocks[] = {
 	/*Icon*/	/*Command*/		/*Update Interval*/	/*Update Signal*/
 	{"  ", "date '+%a %b %d %I:%M%p'",                                  1,      0},
-	{"󰖀 ", "wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{printf \"%d%%\", $2 * 100; if ($3 == \"[MUTED]\") printf \" muted\"; print \"\"}'", 1,0},
+	{"󰖀 ", "wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{printf \"%d%%\", $2 * 100; if ($3 == \"[MUTED]\") printf \" muted\"; print \"\"}'", 30,10},
 	{"", "dwmblocks-wifi", 1, 0},
     {"CPU ", "top -bn1 | awk '/Cpu/ {print int($2+$4+$6+$12+$14+$16) \"%\"}'", 5, 0},     
 	{"", "free --mega | awk '/^Mem/ { print $3\"/\"$2 }' | sed s/i//g",     5,     0},
