@@ -3,6 +3,37 @@
 #include "../dwmblocks.c"
 #undef main
 #include <assert.h>
+#include <errno.h>
+#include <sys/wait.h>
+
+static void
+testinterruptedcommand(const char *command, const char *expected)
+{
+	Block block = {"", (char *)command, 0, 0};
+	char out[CMDLENGTH] = "previous value";
+	pid_t parent = getpid(), sender;
+	int status;
+
+	pending = 0;
+	sender = fork();
+	assert(sender >= 0);
+	if (sender == 0) {
+		struct timespec delay = {0, 10000000};
+		for (int i = 0; i < 25; i++) {
+			nanosleep(&delay, NULL);
+			kill(parent, signalbase + 10);
+		}
+		_exit(0);
+	}
+	getcmd(&block, out);
+	while (waitpid(sender, &status, 0) < 0)
+		assert(errno == EINTR);
+	assert(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+	assert(pending & (1 << 10));
+	if (strcmp(out, expected))
+		fprintf(stderr, "interrupted command: expected '%s', got '%s'\n", expected, out);
+	assert(!strcmp(out, expected));
+}
 
 static void reset(void)
 {
@@ -79,6 +110,22 @@ int main(void)
 	assert(takepending() == 0);
 	sighandler(signalbase);
 	assert(takepending() == 0);
+	setupsignals();
+	/* Test both the normal restartable handler and explicit EINTR recovery. */
+	for (int restart = 1; restart >= 0; restart--) {
+		struct sigaction sa;
+		assert(sigaction(signalbase + 10, NULL, &sa) == 0);
+		if (restart)
+			assert(sa.sa_flags & SA_RESTART);
+		else {
+			sa.sa_flags &= ~SA_RESTART;
+			assert(sigaction(signalbase + 10, &sa, NULL) == 0);
+		}
+		testinterruptedcommand("sleep 0.15; printf 'CPU 12%%\\n'", "CPU 12%");
+		testinterruptedcommand("printf 'Power '; sleep 0.15; printf '8W\\n'", "Power 8W");
+		testinterruptedcommand("printf 'CPU 12%%\\n'; sleep 0.15; printf 'unused\\n'", "CPU 12%");
+		testinterruptedcommand("sleep 0.15; printf '\\n'", "");
+	}
 	termhandler();
 	assert(!statusContinue);
 	puts("status tests passed");

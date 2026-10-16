@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include<stdlib.h>
+#include<errno.h>
 #include<limits.h>
 #include<time.h>
 #include<sys/select.h>
@@ -83,25 +84,44 @@ static void appendtext(char *dest, size_t size, const char *text)
 	dest[used + n] = '\0';
 }
 
+/* stdio reports an interrupted pipe read as EOF with a sticky error flag.
+ * A refresh signal is not end-of-output: retry without losing partial text. */
+static int
+commandgetc(FILE *stream)
+{
+	int c;
+
+	for (;;) {
+		errno = 0;
+		c = fgetc(stream);
+		if (c != EOF || !ferror(stream) || errno != EINTR)
+			return c;
+		clearerr(stream);
+	}
+}
+
 /* Store text only; separators are inserted between nonempty blocks later. */
 void getcmd(const Block *block, char *output)
 {
 	char text[CMDLENGTH + 1];
 	size_t n = 0;
-	int c;
+	int c, failed;
 	FILE *cmdf = popen(block->command, "r");
 	if (!cmdf) {
 		output[0] = '\0';
 		return;
 	}
-	while ((c = fgetc(cmdf)) != EOF && c != '\n')
+	while ((c = commandgetc(cmdf)) != EOF && c != '\n')
 		if (n < sizeof(text) - 1)
 			text[n++] = c;
 	text[n] = '\0';
 	/* Drain unused output so pclose cannot deadlock on a full pipe. */
-	while (fgetc(cmdf) != EOF)
+	while (commandgetc(cmdf) != EOF)
 		;
+	failed = ferror(cmdf);
 	pclose(cmdf);
+	if (failed)
+		return; /* Keep the last good value on a genuine read failure. */
 	output[0] = '\0';
 	if (!text[0])
 		return;
@@ -141,7 +161,8 @@ setupsignals(void)
 	sigaddset(&handledsignals, SIGTERM);
 	sigaddset(&handledsignals, SIGINT);
 	sigfillset(&sa.sa_mask);
-	sa.sa_flags = 0;
+	/* Refresh requests must not interrupt reads of unrelated blocks. */
+	sa.sa_flags = SA_RESTART;
 #ifndef __OpenBSD__
 	sa.sa_handler = dummysighandler;
 	for (int sig = SIGRTMIN; sig <= SIGRTMAX; sig++)
