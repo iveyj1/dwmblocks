@@ -19,7 +19,7 @@ options:
 dwmblocks: dwmblocks.c blocks.def.h blocks.h
 	${CC} -o dwmblocks dwmblocks.c ${CFLAGS} ${LDFLAGS}
 
-blocks.h:
+blocks.h: blocks.def.h
 	cp blocks.def.h $@
 
 clean:
@@ -33,7 +33,7 @@ install: dwmblocks
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/dwmblocks ${DESTDIR}${PREFIX}/bin/dwmblocks-charge-rate ${DESTDIR}${PREFIX}/bin/dwmblocks-wifi
 
-check:
+check: blocks.h
 	@set -eu; testbin=$$(mktemp); trap 'rm -f "$$testbin"' EXIT HUP INT TERM; \
 	${CC} ${CFLAGS} -D_POSIX_C_SOURCE=200809L tests/status.c -o "$$testbin"; \
 	"$$testbin"

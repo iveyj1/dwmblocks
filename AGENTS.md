@@ -1,7 +1,8 @@
 # dwmblocks maintenance
 
-Keep `blocks.h` and `blocks.def.h` consistent when changing the intended default
-configuration. Status tests must not invoke real hardware or alter the X session.
+Edit `blocks.def.h` only. `blocks.h` is an ignored build output, automatically
+regenerated when the template changes. Status tests must not invoke real
+hardware or alter the X session.
 
 ## Change-size history (required)
 

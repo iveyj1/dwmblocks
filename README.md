@@ -15,7 +15,6 @@ See AGENTS.md for the maintenance policy.
 
 ```sh
 make clean
-rm -f blocks.h
 make
 sudo make install
 ```
@@ -41,7 +40,7 @@ Do not also start it in .xprofile when using that launcher.
 
 ## Configuration
 
-Edit `blocks.def.h`, remove generated `blocks.h`, then rebuild. `blocks.h` is copied from `blocks.def.h` when missing. This repo tracks both, so keep them synchronized.
+Edit `blocks.def.h` only, then rebuild. `blocks.h` is ignored and regenerated automatically when the template changes.
 
 Current local blocks include:
 
